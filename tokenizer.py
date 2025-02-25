@@ -3,6 +3,7 @@ import requests
 import spacy
 from tqdm import tqdm
 from collections import Counter
+import random
 
 
 def download_dataset():
@@ -44,45 +45,93 @@ def extract_pos_tags(text):
     Returns:
         list: Part-of-speech tags for each token
     """
-    # Initialize spaCy with English model
     nlp = spacy.load("en_core_web_sm")
-    # Increase the max length to handle large texts
-    nlp.max_length = 2_000_000
-
-    # Process the text
+    nlp.max_length = 2_000_000  # Increase the max length to handle large texts
     doc = nlp(text)
 
-    # Extract POS tags
     pos_list = []
     print("Extracting part-of-speech tags...")
     for token in tqdm(doc):
-        # We only keep the POS label, not the actual word
-        pos_list.append(token.tag_)
+        pos_list.append(token.tag_)  # We only keep the POS label, not the actual word
 
     return pos_list
+
+
+def create_tokenizer_dict(pos_list):
+    """
+    Creates a dictionary mapping POS tags to unique integer ranges.
+
+    Args:
+        pos_list (list): List of part-of-speech tags
+
+    Returns:
+        dict: Dictionary mapping POS tags to integer ranges
+    """
+    pos_counts = Counter(pos_list)
+    pos_counts = dict(
+        sorted(pos_counts.items(), key=lambda item: item[1], reverse=True)
+    )
+
+    tokenizer_dict = {}
+    current_index = 0
+    for pos, count in pos_counts.items():
+        tokenizer_dict[pos] = (current_index, current_index + count)
+        current_index += count
+    return tokenizer_dict
+
+
+def tokenize_text(text, tokenizer_dict):
+    """
+    Tokenizes text by replacing each word with a random number from the range
+    corresponding to its POS tag.
+
+    Args:
+        text (str): Input text to tokenize
+        tokenizer_dict (dict): Dictionary mapping POS tags to integer ranges
+
+    Returns:
+        list: List of integer tokens
+    """
+    tokenized_text = []
+    nlp = spacy.load("en_core_web_sm")
+    nlp.max_length = 2_000_000  # Increase max length to handle large texts
+
+    print("Tokenizing text...")
+    doc = nlp(text)
+
+    for token in tqdm(doc):
+        pos_tag = token.tag_
+        if pos_tag in tokenizer_dict:
+            start, end = tokenizer_dict[pos_tag]
+            token_id = random.randint(start, end - 1)
+            tokenized_text.append(token_id)
+        else:
+            print(f"Warning: Unknown POS tag '{pos_tag}' for token '{token.text}'")
+            tokenized_text.append(-1)  # Use -1 for unknown tags
+
+    return tokenized_text
 
 
 def main():
     """
     Main function that coordinates the tokenization process.
     """
-    # Get input data
     input_path = download_dataset()
     data = read_data(input_path)
 
-    # Extract POS tags
     pos_tags = extract_pos_tags(data)
+    tokenizer_dict = create_tokenizer_dict(pos_tags)
 
-    # Count occurrences of each POS tag
-    pos_counts = Counter(pos_tags)
+    print(tokenizer_dict)
 
-    # Display results
-    print("\nPOS Tag Distribution:")
-    print(pos_counts)
+    tokenized_text = tokenize_text(data, tokenizer_dict)
 
-    # You could add more analysis here
-    print(f"Total tokens processed: {len(pos_tags)}")
-    print(f"Unique POS tags found: {len(pos_counts)}")
+    print(f"Total tokens: {len(tokenized_text)}")
+    print(f"Sample of tokenized text (first 20 tokens): {tokenized_text[:20]}")
+
+    # Optionally save the tokenized text
+    # with open('tokenized_output.txt', 'w') as f:
+    #     f.write('\n'.join(map(str, tokenized_text)))
 
 
 if __name__ == "__main__":
