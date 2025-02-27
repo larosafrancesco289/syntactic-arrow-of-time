@@ -4,6 +4,11 @@ import spacy
 from tqdm import tqdm
 from collections import Counter
 import random
+import numpy as np
+import pickle
+
+# Store vocab_size for later use
+vocab_size = 0
 
 
 def download_dataset():
@@ -77,6 +82,13 @@ def create_tokenizer_dict(pos_list):
     for pos, count in pos_counts.items():
         tokenizer_dict[pos] = (current_index, current_index + count)
         current_index += count
+
+    # Vocabulary size calculation
+    global vocab_size
+    max_token_id = current_index - 1  # e.g. 120k if that's how many tokens you had
+    vocab_size = max_token_id + 1  # must be one more than the largest ID
+    print(f"Vocabulary size: {vocab_size:,}")
+
     return tokenizer_dict
 
 
@@ -124,14 +136,28 @@ def main():
 
     print(tokenizer_dict)
 
-    tokenized_text = tokenize_text(data, tokenizer_dict)
+    # Let's split into train and validation sets
+    train_data = data[: int(len(data) * 0.9)]
+    val_data = data[int(len(data) * 0.9) :]
 
-    print(f"Total tokens: {len(tokenized_text)}")
-    print(f"Sample of tokenized text (first 20 tokens): {tokenized_text[:20]}")
+    # Tokenize training and validation data
+    train_tokenized = tokenize_text(train_data, tokenizer_dict)
+    val_tokenized = tokenize_text(val_data, tokenizer_dict)
 
-    # Optionally save the tokenized text
-    # with open('tokenized_output.txt', 'w') as f:
-    #     f.write('\n'.join(map(str, tokenized_text)))
+    # Print the number of tokens in each set
+    print(f"Train has {len(train_tokenized):,} tokens")
+    print(f"Val has {len(val_tokenized):,} tokens")
+
+    # Convert to numpy arrays and save to binary files
+    train_tokenized = np.array(train_tokenized, dtype=np.uint32)
+    val_tokenized = np.array(val_tokenized, dtype=np.uint32)
+    train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))
+    val_tokenized.tofile(os.path.join(os.path.dirname(__file__), "val.bin"))
+
+    # Save the meta information as well, to help us encode/decode later
+    meta = {"vocab_size": vocab_size}
+    with open(os.path.join(os.path.dirname(__file__), "meta.pkl"), "wb") as f:
+        pickle.dump(meta, f)
 
 
 if __name__ == "__main__":
