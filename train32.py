@@ -139,11 +139,11 @@ def get_batch(split):
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
     if split == "train":
         data = np.memmap(
-            os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r"
+            os.path.join(data_dir, "train.bin"), dtype=np.uint32, mode="r"
         )  # TODO: change from uint16 to uint32 otherwise output might get truncated
     else:
         data = np.memmap(
-            os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r"
+            os.path.join(data_dir, "val.bin"), dtype=np.uint32, mode="r"
         )  # TODO: change from uint16 to uint32 otherwise output might get truncated
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack(

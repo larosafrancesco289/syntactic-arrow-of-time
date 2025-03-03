@@ -61,3 +61,11 @@ Thumbs.db
 *.pid
 *.seed
 *.pid.lock
+
+# Weights & Biases
+/wandb/
+
+# Output directories
+/out-shakespeare_pos_id
+/out-shakespeare_char
+/out-shakespeare_pos_range

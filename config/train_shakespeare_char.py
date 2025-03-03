@@ -12,8 +12,8 @@ log_interval = 1  # don't print too too often
 always_save_checkpoint = False
 
 wandb_log = False  # override via command line if you like
-wandb_project = "shakespeare_char"
-wandb_run_name = "mini-gpt"
+wandb_project = "semester-project"
+wandb_run_name = "shakespeare_char_16bits"
 
 dataset = "shakespeare_char"
 gradient_accumulation_steps = 1

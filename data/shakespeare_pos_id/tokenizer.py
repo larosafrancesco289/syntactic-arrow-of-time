@@ -141,8 +141,8 @@ def main():
     print(f"Val has {len(val_tokenized):,} tokens")
 
     # Convert to numpy arrays and save to binary files
-    train_tokenized = np.array(train_tokenized, dtype=np.uint32)
-    val_tokenized = np.array(val_tokenized, dtype=np.uint32)
+    train_tokenized = np.array(train_tokenized, dtype=np.uint16)
+    val_tokenized = np.array(val_tokenized, dtype=np.uint16)
     train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))
     val_tokenized.tofile(os.path.join(os.path.dirname(__file__), "val.bin"))
 
