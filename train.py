@@ -138,9 +138,13 @@ def get_batch(split):
     # We recreate np.memmap every batch to avoid a memory leak, as per
     # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
     if split == "train":
-        data = np.memmap(os.path.join(data_dir, "train.bin"), dtype=np.uint32, mode="r")
+        data = np.memmap(
+            os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r"
+        )  # WARNING: changed from uint16 to uint32
     else:
-        data = np.memmap(os.path.join(data_dir, "val.bin"), dtype=np.uint32, mode="r")
+        data = np.memmap(
+            os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r"
+        )  # WARNING: changed from uint16 to uint32
     ix = torch.randint(len(data) - block_size, (batch_size,))
     x = torch.stack(
         [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
