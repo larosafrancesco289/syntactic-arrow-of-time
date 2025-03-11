@@ -57,7 +57,13 @@ def extract_pos_tags(text):
     Returns:
         list: List of (word, POS tag) tuples for each token in the text
     """
-    nlp = spacy.load("en_core_web_lg")  # Use spaCy's large English model
+    nlp = spacy.load(
+        "en_core_web_sm",
+        disable=[
+            "parser",
+            "ner",
+        ],  # Disable the parser and named entity recognition components for speed
+    )  # Note sm is fast and cnn model and trf is the transformer model but it's too slow
     nlp.max_length = 2_000_000  # Increase max length to handle large texts
     doc = nlp(text)
     print("Extracting words and part-of-speech tags...")
