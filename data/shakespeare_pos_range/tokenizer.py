@@ -62,12 +62,21 @@ def extract_pos_tags(text):
         disable=[
             "parser",
             "ner",
-        ],  # Disable the parser and named entity recognition components for speed
-    )  # Note sm is fast and cnn model and trf is the transformer model but it's too slow
+            "attribute_ruler",
+            "lemmatizer",
+        ],  # Disable unnecessary components
+    )  # Note sm is fast and  a cnn model while trf is the transformer model but it's too slow
     nlp.max_length = 2_000_000  # Increase max length to handle large texts
-    doc = nlp(text)
+    print("Active pipeline components (pipe_names):", nlp.pipe_names)
+    chunks = [
+        chunk.strip() for chunk in text.split("\n\n") if chunk.strip()
+    ]  # Split text into chunks separated by double newlines
+    all_tokens = []
     print("Extracting words and part-of-speech tags...")
-    return [(token.text, token.tag_) for token in tqdm(doc)]
+    # Process each chunk through the NLP pipeline with n_process=-1 to use all available CPU cores
+    for doc in tqdm(nlp.pipe(chunks, n_process=4), total=len(chunks)):
+        all_tokens.extend([(token.text, token.tag_) for token in doc])
+    return all_tokens
 
 
 def create_tokenizer_dict(all_tokens):
