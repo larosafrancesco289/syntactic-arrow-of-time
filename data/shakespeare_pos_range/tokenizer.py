@@ -6,9 +6,48 @@ from collections import defaultdict
 import random
 import numpy as np
 import pickle
+import torch
+from torch.utils.data import Dataset
 
 # Global variable to store the total vocabulary size
 vocab_size = 0
+
+
+class POSDataset(Dataset):
+    """
+    PyTorch Dataset for part-of-speech tokenized data, supporting both forward and backward sequences.
+    """
+
+    def __init__(self, file_path, block_size, backwards=False):
+        """
+        Args:
+            file_path (str): Path to binary file with tokenized data
+            block_size (int): Number of tokens in a sequence
+            backwards (bool): Whether to return sequences in reverse order
+        """
+        self.block_size = block_size
+        self.backwards = backwards
+
+        # Load data using memmap to handle large files efficiently
+        self.data = np.memmap(file_path, dtype=np.uint16, mode="r")
+
+    def __len__(self):
+        return len(self.data) - self.block_size
+
+    def __getitem__(self, idx):
+        # Get a sequence of tokens starting at idx
+        x = torch.from_numpy((self.data[idx : idx + self.block_size]).astype(np.int64))
+        # Target is next token in the sequence
+        y = torch.from_numpy(
+            (self.data[idx + 1 : idx + 1 + self.block_size]).astype(np.int64)
+        )
+
+        if self.backwards:
+            # Reverse both sequences
+            x = torch.flip(x, [0])
+            y = torch.flip(y, [0])
+
+        return x, y
 
 
 def download_dataset():
@@ -186,7 +225,7 @@ def main():
     print(f"Train has {len(train_tokenized):,} tokens")
     print(f"Val has {len(val_tokenized):,} tokens")
 
-    # Save to binary files for efficient storage and loading
+    # Save to binary files for efficient storage and loading using uint32 instead of uint16
     train_tokenized = np.array(train_tokenized, dtype=np.uint16)
     val_tokenized = np.array(val_tokenized, dtype=np.uint16)
     train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))

@@ -133,36 +133,72 @@ ctx = (
 data_dir = os.path.join("data", dataset)
 print(f"using data from {data_dir}")
 
+# Import POSDataset from the tokenizer module
+from data.shakespeare_pos_range.tokenizer import POSDataset
+from torch.utils.data import DataLoader
+
+# Create datasets and DataLoaders
+backwards = False  # Set to True if you want backwards samples
+train_dataset = POSDataset(
+    os.path.join(data_dir, "train.bin"), block_size, backwards=backwards
+)
+val_dataset = POSDataset(
+    os.path.join(data_dir, "val.bin"), block_size, backwards=backwards
+)
+
+train_loader = DataLoader(
+    train_dataset,
+    batch_size=batch_size,
+    shuffle=True,
+    pin_memory=(device_type == "cuda"),
+)
+val_loader = DataLoader(
+    val_dataset,
+    batch_size=batch_size,
+    shuffle=False,
+    pin_memory=(device_type == "cuda"),
+)
+
+# Create iterators
+train_iter = iter(train_loader)
+val_iter = iter(val_loader)
+
 
 def get_batch(split):
-    # We recreate np.memmap every batch to avoid a memory leak, as per
-    # https://stackoverflow.com/questions/45132940/numpy-memmap-memory-usage-want-to-iterate-once/61472122#61472122
-    if split == "train":
-        data = np.memmap(
-            os.path.join(data_dir, "train.bin"), dtype=np.uint16, mode="r"
-        )  # TODO: change from uint16 to uint32 otherwise output might get truncated
-    else:
-        data = np.memmap(
-            os.path.join(data_dir, "val.bin"), dtype=np.uint16, mode="r"
-        )  # TODO: change from uint16 to uint32 otherwise output might get truncated
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack(
-        [torch.from_numpy((data[i : i + block_size]).astype(np.int64)) for i in ix]
-    )
-    y = torch.stack(
-        [
-            torch.from_numpy((data[i + 1 : i + 1 + block_size]).astype(np.int64))
-            for i in ix
-        ]
-    )
+    """
+    Get a batch of data using PyTorch DataLoader.
 
-    if device_type == "cuda":
-        # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-        x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(
-            device, non_blocking=True
-        )
+    Args:
+        split (str): 'train' or 'val' to specify which dataset to use
+
+    Returns:
+        tuple: x and y tensors (input and target)
+    """
+    global train_iter, val_iter
+
+    if split == "train":
+        try:
+            x, y = next(train_iter)
+        except StopIteration:
+            # Restart iterator when we've gone through the entire dataset
+            train_iter = iter(train_loader)
+            x, y = next(train_iter)
     else:
-        x, y = x.to(device), y.to(device)
+        try:
+            x, y = next(val_iter)
+        except StopIteration:
+            # Restart iterator when we've gone through the entire dataset
+            val_iter = iter(val_loader)
+            x, y = next(val_iter)
+
+    # The dataset class already handles moving to device with pin_memory
+    if device_type == "cuda":
+        x = x.to(device, non_blocking=True)
+        y = y.to(device, non_blocking=True)
+    else:
+        x = x.to(device)
+        y = y.to(device)
+
     return x, y
 
 
