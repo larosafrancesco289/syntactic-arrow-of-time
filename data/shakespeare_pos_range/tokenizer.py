@@ -226,7 +226,7 @@ def main():
     print(f"Train has {len(train_tokenized):,} tokens")
     print(f"Val has {len(val_tokenized):,} tokens")
 
-    # Save to binary files for efficient storage and loading using uint32 instead of uint16
+    # Save to binary files for efficient storage and loading using uint16
     train_tokenized = np.array(train_tokenized, dtype=np.uint16)
     val_tokenized = np.array(val_tokenized, dtype=np.uint16)
     train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))
