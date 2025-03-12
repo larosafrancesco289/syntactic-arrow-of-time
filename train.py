@@ -29,6 +29,10 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from model import GPTConfig, GPT
 
+# Import POSDataset from the tokenizer module
+from data.shakespeare_pos_range.tokenizer import POSDataset
+from torch.utils.data import DataLoader
+
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -132,10 +136,6 @@ ctx = (
 # poor man's data loader
 data_dir = os.path.join("data", dataset)
 print(f"using data from {data_dir}")
-
-# Import POSDataset from the tokenizer module
-from data.shakespeare_pos_range.tokenizer import POSDataset
-from torch.utils.data import DataLoader
 
 # Create datasets and DataLoaders
 backwards = False  # Set to True if you want backwards samples

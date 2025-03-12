@@ -35,17 +35,18 @@ class POSDataset(Dataset):
         return len(self.data) - self.block_size
 
     def __getitem__(self, idx):
-        # Get a sequence of tokens starting at idx
-        x = torch.from_numpy((self.data[idx : idx + self.block_size]).astype(np.int64))
-        # Target is next token in the sequence
-        y = torch.from_numpy(
-            (self.data[idx + 1 : idx + 1 + self.block_size]).astype(np.int64)
-        )
-
         if self.backwards:
-            # Reverse both sequences
-            x = torch.flip(x, [0])
-            y = torch.flip(y, [0])
+            # For reverse-direction model: predict previous tokens from future context
+            x = self.data[idx + 1 : idx + 1 + self.block_size][::-1]
+            y = self.data[idx : idx + self.block_size][::-1]
+        else:
+            # For forward-direction model: predict next tokens from past context
+            x = self.data[idx : idx + self.block_size]
+            y = self.data[idx + 1 : idx + 1 + self.block_size]
+
+        # Convert NumPy arrays to PyTorch tensors
+        x = torch.from_numpy(x.astype(np.int64))
+        y = torch.from_numpy(y.astype(np.int64))
 
         return x, y
 
