@@ -33,6 +33,10 @@ from model import GPTConfig, GPT
 from data.shakespeare_pos_range.tokenizer import POSDataset
 from torch.utils.data import DataLoader
 
+# Learning rate imports
+import math
+from torch.optim.lr_scheduler import SequentialLR, LinearLR, ConstantLR, LambdaLR
+
 # -----------------------------------------------------------------------------
 # default config values designed to train a gpt2 (124M) on OpenWebText
 # I/O
@@ -82,8 +86,19 @@ dtype = (
     else "float16"
 )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
 compile = True  # use PyTorch 2.0 to compile the model to be faster
+# -----------------------------------------------------------------------------
+# My settings
 # Backwards or forwards
 backwards = False  # if True, train the model to predict the previous token
+# learning rate decay settings
+decay_lr = True  # whether to decay the learning rate (if False, use constant LR)
+warmup_iters = 2000  # number of steps for linear warmup
+cooldown_fraction = (
+    0.1  # fraction of total iterations for cooldown (e.g., 10% as per paper)
+)
+cooldown_type = "linear"  # 'linear' or '1-sqrt' for cooldown decay function
+min_lr = 0.0  # minimum learning rate at end of cooldown (paper often uses 0)
+lr_decay_iters = 600000  # not used in constant+cooldown but kept for compatibility
 # -----------------------------------------------------------------------------
 config_keys = [
     k
@@ -93,7 +108,16 @@ config_keys = [
 exec(open("configurator.py").read())  # overrides from command line or config file
 config = {k: globals()[k] for k in config_keys}  # will be useful for logging
 # -----------------------------------------------------------------------------
-
+# Compute milestones for learning rate scheduler phases
+if decay_lr:
+    cooldown_iters = int(cooldown_fraction * max_iters)
+    if cooldown_iters <= 0:
+        cooldown_iters = 0
+    start_cooldown = max_iters - cooldown_iters
+else:
+    cooldown_iters = 0
+    start_cooldown = max_iters
+# -----------------------------------------------------------------------------
 # various inits, derived attributes, I/O setup
 ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
 if ddp:
@@ -287,6 +311,61 @@ if init_from == "resume":
     optimizer.load_state_dict(checkpoint["optimizer"])
 checkpoint = None  # free up memory
 
+# Define the learning rate scheduler for constant + cooldown
+if decay_lr:
+    warmup_scheduler = LinearLR(
+        optimizer,
+        start_factor=1e-6,  # Small positive value instead of 0
+        end_factor=1.0,
+        total_iters=warmup_iters,
+    )
+    constant_scheduler = ConstantLR(
+        optimizer, factor=1.0, total_iters=start_cooldown - warmup_iters
+    )
+    if cooldown_type == "linear":
+        cooldown_scheduler = LinearLR(
+            optimizer,
+            start_factor=1.0,
+            end_factor=min_lr / learning_rate,
+            total_iters=cooldown_iters if cooldown_iters > 0 else 1,
+        )
+    elif cooldown_type == "1-sqrt":
+
+        def cooldown_lambda(epoch):
+            t = epoch / cooldown_iters
+            return (min_lr / learning_rate) + (1.0 - min_lr / learning_rate) * (
+                1 - math.sqrt(t)
+            )
+
+        cooldown_scheduler = LambdaLR(
+            optimizer, lr_lambda=cooldown_lambda, last_epoch=-1
+        )
+    else:
+        raise ValueError(
+            f"Unknown cooldown_type: {cooldown_type}. Use 'linear' or '1-sqrt'."
+        )
+    schedulers = [warmup_scheduler, constant_scheduler, cooldown_scheduler]
+    milestones = [warmup_iters, start_cooldown]
+    lr_scheduler = SequentialLR(
+        optimizer, schedulers=schedulers, milestones=milestones, verbose=False
+    )
+else:
+    warmup_scheduler = LinearLR(
+        optimizer, start_factor=0.0, end_factor=1.0, total_iters=warmup_iters
+    )
+    constant_scheduler = ConstantLR(
+        optimizer, factor=1.0, total_iters=max_iters - warmup_iters
+    )
+    lr_scheduler = SequentialLR(
+        optimizer,
+        schedulers=[warmup_scheduler, constant_scheduler],
+        milestones=[warmup_iters],
+    )
+
+# Set initial LR to 0 for warmup
+for param_group in optimizer.param_groups:
+    param_group["lr"] = 0.0
+
 # compile the model
 if compile:
     print("compiling the model... (takes a ~minute)")
@@ -315,21 +394,6 @@ def estimate_loss():
     return out
 
 
-# learning rate decay scheduler (cosine with warmup)
-def get_lr(it):
-    # 1) linear warmup for warmup_iters steps
-    if it < warmup_iters:
-        return learning_rate * (it + 1) / (warmup_iters + 1)
-    # 2) if it > lr_decay_iters, return min learning rate
-    if it > lr_decay_iters:
-        return min_lr
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-    return min_lr + coeff * (learning_rate - min_lr)
-
-
 # logging
 if wandb_log and master_process:
     import wandb
@@ -345,10 +409,9 @@ raw_model = model.module if ddp else model  # unwrap DDP container if needed
 running_mfu = -1.0
 while True:
 
-    # determine and set the learning rate for this iteration
-    lr = get_lr(iter_num) if decay_lr else learning_rate
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
+    # Update learning rate using the scheduler
+    lr_scheduler.step()
+    lr = optimizer.param_groups[0]["lr"]  # For logging
 
     # evaluate the loss on train/val sets and write checkpoints
     if iter_num % eval_interval == 0 and master_process:

@@ -13,7 +13,7 @@ always_save_checkpoint = False
 
 wandb_log = False  # override via command line if you like
 wandb_project = "semester-project-run3"
-wandb_run_name = "shakespeare_pos_range"
+wandb_run_name = "shakespeare_pos_range_linearscheduler"
 
 dataset = "shakespeare_pos_range"
 gradient_accumulation_steps = 1
@@ -28,11 +28,16 @@ dropout = 0.0
 
 learning_rate = 1e-3  # with baby networks can afford to go a bit higher
 max_iters = 2000
-lr_decay_iters = 2000  # make equal to max_iters usually
-min_lr = 1e-4  # learning_rate / 10 usually
+lr_decay_iters = 2000  # make equal to max_iters usually (unused in this scheduler)
+min_lr = 0.0  # learning_rate / 10 usually, but set to 0 for cooldown
 beta2 = 0.99  # make a bit bigger because number of tokens per iter is small
 
 warmup_iters = 100  # not super necessary potentially
+
+# Learning rate scheduler settings
+decay_lr = True  # Enable the constant + cooldown schedule
+cooldown_fraction = 0.1  # 10% of max_iters for cooldown
+cooldown_type = "linear"  # Use a linear cooldown
 
 backwards = False
 
