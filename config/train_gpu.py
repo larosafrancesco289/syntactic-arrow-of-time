@@ -12,8 +12,8 @@ log_interval = 1  # don't print too too often
 always_save_checkpoint = False
 
 wandb_log = False  # override via command line if you like
-wandb_project = "semester-project-run4"
-wandb_run_name = "shakespeare_pos_range"
+wandb_project = "semester-project-biggermodel"
+wandb_run_name = "shakespeare_pos_range_forward"
 
 dataset = "shakespeare_pos_range"
 gradient_accumulation_steps = 1
@@ -35,6 +35,8 @@ beta2 = 0.99  # make a bit bigger because number of tokens per iter is small
 warmup_iters = 100  # not super necessary potentially
 
 # on macbook also add
+device = "cuda"  # train on GPU
+compile = False
 # device = 'cpu'  # run on cpu only
 # compile = False # do not torch compile the model
 

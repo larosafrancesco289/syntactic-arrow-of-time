@@ -34,6 +34,8 @@ beta2 = 0.99  # make a bit bigger because number of tokens per iter is small
 
 warmup_iters = 100  # not super necessary potentially
 
+backwards = False
+
 # Macbook settings
 device = "mps"  # run on mps (macs only)
 compile = False

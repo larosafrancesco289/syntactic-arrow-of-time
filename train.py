@@ -82,6 +82,8 @@ dtype = (
     else "float16"
 )  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
 compile = True  # use PyTorch 2.0 to compile the model to be faster
+# Backwards or forwards
+backwards = False  # if True, train the model to predict the previous token
 # -----------------------------------------------------------------------------
 config_keys = [
     k
@@ -138,7 +140,6 @@ data_dir = os.path.join("data", dataset)
 print(f"using data from {data_dir}")
 
 # Create datasets and DataLoaders
-backwards = False  # Set to True if you want backwards samples
 train_dataset = POSDataset(
     os.path.join(data_dir, "train.bin"), block_size, backwards=backwards
 )
