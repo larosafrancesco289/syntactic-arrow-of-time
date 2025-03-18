@@ -35,14 +35,21 @@ class POSDataset(Dataset):
         return len(self.data) - self.block_size
 
     def __getitem__(self, idx):
+        chunk = self.data[idx : idx + self.block_size]  # (blocksize,)
+
         if self.backwards:
-            # For reverse-direction model: predict previous tokens from future context
-            x = self.data[idx + 1 : idx + 1 + self.block_size][::-1]
-            y = self.data[idx : idx + self.block_size][::-1]
+            # For reverse-direction model: reverse the chunk and append BOS
+            chunk = chunk[::-1]  # Reverse the chunk
+            # Append BOS token at the end
+            chunk_bos = np.append(chunk, vocab_size)  # (blocksize+1,)
+            x = chunk_bos[:-1]  # (blocksize,)
+            y = chunk_bos[1:]  # (blocksize,)
         else:
-            # For forward-direction model: predict next tokens from past context
-            x = self.data[idx : idx + self.block_size]
-            y = self.data[idx + 1 : idx + 1 + self.block_size]
+            # For forward-direction model: prepend BOS to the chunk
+            # Prepend BOS token at the beginning
+            chunk_bos = np.append(np.array([vocab_size]), chunk)  # (blocksize+1,)
+            x = chunk_bos[:-1]  # (blocksize,)
+            y = chunk_bos[1:]  # (blocksize,)
 
         # Convert NumPy arrays to PyTorch tensors
         x = torch.from_numpy(x.astype(np.int64))

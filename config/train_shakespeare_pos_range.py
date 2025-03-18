@@ -12,8 +12,8 @@ log_interval = 1  # don't print too too often
 always_save_checkpoint = False
 
 wandb_log = False  # override via command line if you like
-wandb_project = "semester-project-run3"
-wandb_run_name = "shakespeare_pos_range_linearscheduler"
+wandb_project = "semester-project-test"
+wandb_run_name = "shakespeare_pos_range"
 
 dataset = "shakespeare_pos_range"
 gradient_accumulation_steps = 1
@@ -36,7 +36,7 @@ warmup_iters = 100  # not super necessary potentially
 
 # Learning rate scheduler settings
 decay_lr = True  # Enable the constant + cooldown schedule
-cooldown_fraction = 0.1  # 10% of max_iters for cooldown
+cooldown_fraction = 0.15  # 15% of max_iters for cooldown
 cooldown_type = "linear"  # Use a linear cooldown
 
 backwards = False
