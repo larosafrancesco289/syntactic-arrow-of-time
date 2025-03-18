@@ -31,7 +31,7 @@ class POSDataset(Dataset):
         self.backwards = backwards
 
         # Load data using memmap to handle large files efficiently
-        self.data = np.memmap(file_path, dtype=np.uint16, mode="r")
+        self.data = np.memmap(file_path, dtype=np.uint32, mode="r")
 
     def __len__(self):
         return len(self.data) - self.block_size
@@ -123,7 +123,9 @@ def extract_pos_tags(text):
     all_tokens = []
     print("Extracting words and part-of-speech tags...")
     # Process each chunk through the NLP pipeline with n_process=-1 to use all available CPU cores
-    for doc in tqdm(nlp.pipe(chunks, n_process=4, batch_size=1000), total=len(chunks)):
+    for doc in tqdm(
+        nlp.pipe(chunks, n_process=-1, batch_size=10000), total=len(chunks)
+    ):
         all_tokens.extend([(token.text, token.tag_) for token in doc])
     return all_tokens
 
@@ -236,8 +238,8 @@ def main():
     print(f"Val has {len(val_tokenized):,} tokens")
 
     # Save to binary files for efficient storage and loading using uint16
-    train_tokenized = np.array(train_tokenized, dtype=np.uint16)
-    val_tokenized = np.array(val_tokenized, dtype=np.uint16)
+    train_tokenized = np.array(train_tokenized, dtype=np.uint32)
+    val_tokenized = np.array(val_tokenized, dtype=np.uint32)
     train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))
     val_tokenized.tofile(os.path.join(os.path.dirname(__file__), "val.bin"))
 
