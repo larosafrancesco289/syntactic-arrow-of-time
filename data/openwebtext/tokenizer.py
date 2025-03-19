@@ -11,6 +11,9 @@ import torch
 from torch.utils.data import Dataset
 from datasets import load_dataset
 
+# Maximum vocabulary size for 16-bit representation
+MAX_VOCAB_SIZE = 65535  # 2^16 - 1
+
 # Global variable to store the total vocabulary size
 vocab_size = 0
 
@@ -31,7 +34,7 @@ class POSDataset(Dataset):
         self.backwards = backwards
 
         # Load data using memmap to handle large files efficiently
-        self.data = np.memmap(file_path, dtype=np.uint32, mode="r")
+        self.data = np.memmap(file_path, dtype=np.uint16, mode="r")  # Changed to uint16
 
     def __len__(self):
         return len(self.data) - self.block_size
@@ -157,10 +160,22 @@ def create_tokenizer_dict(all_tokens):
         unique_word_counts, key=unique_word_counts.get, reverse=False
     )
 
+    # Calculate total unique words
+    total_unique_words = sum(unique_word_counts.values())
+
+    # Calculate scaling factor if total exceeds maximum
+    scaling_factor = 1.0
+    if total_unique_words > MAX_VOCAB_SIZE - 1:  # Reserve 1 for BOS token
+        scaling_factor = (MAX_VOCAB_SIZE - 1) / total_unique_words
+        print(
+            f"Scaling vocabulary by factor of {scaling_factor:.4f} to fit within 16 bits"
+        )
+
     tokenizer_dict = {}
     current_index = 0
     for pos_tag in sorted_pos_tags:
-        num_unique = unique_word_counts[pos_tag]
+        # Scale the number of unique words for this POS tag
+        num_unique = max(1, int(unique_word_counts[pos_tag] * scaling_factor))
         tokenizer_dict[pos_tag] = (current_index, current_index + num_unique)
         current_index += num_unique
 
@@ -171,6 +186,11 @@ def create_tokenizer_dict(all_tokens):
     global vocab_size
     vocab_size = current_index
     print(f"Vocabulary size: {vocab_size:,}")
+
+    if vocab_size >= MAX_VOCAB_SIZE:
+        raise ValueError(
+            f"Vocabulary size {vocab_size} exceeds maximum allowed size of {MAX_VOCAB_SIZE}"
+        )
 
     return tokenizer_dict
 
@@ -238,8 +258,8 @@ def main():
     print(f"Val has {len(val_tokenized):,} tokens")
 
     # Save to binary files for efficient storage and loading using uint16
-    train_tokenized = np.array(train_tokenized, dtype=np.uint32)
-    val_tokenized = np.array(val_tokenized, dtype=np.uint32)
+    train_tokenized = np.array(train_tokenized, dtype=np.uint16)  # Changed to uint16
+    val_tokenized = np.array(val_tokenized, dtype=np.uint16)  # Changed to uint16
     train_tokenized.tofile(os.path.join(os.path.dirname(__file__), "train.bin"))
     val_tokenized.tofile(os.path.join(os.path.dirname(__file__), "val.bin"))
 

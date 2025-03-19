@@ -1,4 +1,5 @@
 import os
+import token
 import requests
 import spacy
 from tqdm import tqdm
@@ -111,7 +112,7 @@ def extract_pos_tags(text):
             "ner",
             "attribute_ruler",
             "lemmatizer",
-        ],  # Disable unnecessary components
+        ],  # Disable unnecessary components, normal pos_ requires also attribute_ruler
     )  # Note sm is fast and  a cnn model while trf is the transformer model but it's too slow
     nlp.max_length = 2_000_000  # Increase max length to handle large texts
     print("Active pipeline components (pipe_names):", nlp.pipe_names)
