@@ -43,16 +43,16 @@ class POSDataset(Dataset):
         chunk = self.data[idx : idx + self.block_size]  # (blocksize,)
 
         if self.backwards:
-            # For reverse-direction model: append BOS reverse the chunk and append BOS
+            # For reverse-direction model: reverse the chunk and append BOS
+            chunk = chunk[::-1]  # Reverse the chunk
             # Append BOS token at the end
             chunk_bos = np.append(chunk, vocab_size)  # (blocksize+1,)
-            chunk_bos = chunk_bos[::-1]  # Reverse the chunk
             x = chunk_bos[:-1]  # (blocksize,)
             y = chunk_bos[1:]  # (blocksize,)
         else:
             # For forward-direction model: prepend BOS to the chunk
             # Prepend BOS token at the beginning
-            chunk_bos = np.insert(chunk, 0, vocab_size)  # (blocksize+1,)
+            chunk_bos = np.append(np.array([vocab_size]), chunk)  # (blocksize+1,)
             x = chunk_bos[:-1]  # (blocksize,)
             y = chunk_bos[1:]  # (blocksize,)
 
@@ -126,7 +126,9 @@ def extract_pos_tags(text):
     all_tokens = []
     print("Extracting words and part-of-speech tags...")
     # Process each chunk through the NLP pipeline with n_process=-1 to use all available CPU cores
-    for doc in tqdm(nlp.pipe(chunks, n_process=-1, batch_size=5000), total=len(chunks)):
+    for doc in tqdm(
+        nlp.pipe(chunks, n_process=-1, batch_size=1000), total=len(chunks)
+    ):
         all_tokens.extend([(token.text, token.tag_) for token in doc])
     return all_tokens
 
@@ -135,8 +137,9 @@ def create_tokenizer_dict(all_tokens):
     """
     Creates a dictionary mapping POS tags to unique integer ranges.
 
-    Assigns a continuous range of integers to each POS tag based on the number of
-    unique words, with 'NNP' capped at 2000 tokens before scaling others.
+    For each part-of-speech tag, assigns a continuous range of integers
+    based on the number of unique words with that tag. POS tags with more
+    unique words are assigned wider ranges.
 
     Args:
         all_tokens (list): List of (word, POS tag) tuples
@@ -144,7 +147,6 @@ def create_tokenizer_dict(all_tokens):
     Returns:
         dict: Dictionary mapping POS tags to (start, end) integer ranges
     """
-    # Step 1: Collect unique words per POS tag
     pos_to_unique_words = defaultdict(set)
     for word, pos_tag in all_tokens:
         pos_to_unique_words[pos_tag].add(word)
@@ -153,56 +155,41 @@ def create_tokenizer_dict(all_tokens):
         pos_tag: len(words) for pos_tag, words in pos_to_unique_words.items()
     }
 
-    # Step 2: Handle 'NNP' allocation
-    if "NNP" in unique_word_counts:
-        actual_unique_NNP = unique_word_counts["NNP"]
-        allocation_for_NNP = min(2000, actual_unique_NNP)
-    else:
-        allocation_for_NNP = 0
+    # Sort POS tags by number of unique words, descending
+    sorted_pos_tags = sorted(
+        unique_word_counts, key=unique_word_counts.get, reverse=False
+    )
 
-    # Step 3: Process other POS tags
-    other_pos_tags = [pos_tag for pos_tag in unique_word_counts if pos_tag != "NNP"]
-    sorted_other_pos_tags = sorted(other_pos_tags, key=lambda x: unique_word_counts[x])
+    # Calculate total unique words
+    total_unique_words = sum(unique_word_counts.values())
 
-    # Calculate total unique words for other POS tags
-    total_other_unique = sum(unique_word_counts[pos_tag] for pos_tag in other_pos_tags)
-
-    # Step 4: Calculate scaling factor for other tags
-    remaining = MAX_VOCAB_SIZE - 1 - allocation_for_NNP  # Reserve 1 for BOS
-    if total_other_unique > remaining and total_other_unique > 0:
-        scaling_factor = remaining / total_other_unique
+    # Calculate scaling factor if total exceeds maximum
+    scaling_factor = 1.0
+    if total_unique_words > MAX_VOCAB_SIZE - 1:  # Reserve 1 for BOS token
+        scaling_factor = (MAX_VOCAB_SIZE - 1) / total_unique_words
         print(
-            f"Scaling non-NNP vocabulary by factor of {scaling_factor:.4f} to fit within limit"
+            f"Scaling vocabulary by factor of {scaling_factor:.4f} to fit within 16 bits"
         )
-    else:
-        scaling_factor = 1.0
 
-    # Step 5: Assign ranges
     tokenizer_dict = {}
     current_index = 0
-
-    # Assign ranges to other POS tags
-    for pos_tag in sorted_other_pos_tags:
+    for pos_tag in sorted_pos_tags:
+        # Scale the number of unique words for this POS tag
         num_unique = max(1, int(unique_word_counts[pos_tag] * scaling_factor))
         tokenizer_dict[pos_tag] = (current_index, current_index + num_unique)
         current_index += num_unique
 
-    # Assign range to 'NNP' if present
-    if "NNP" in unique_word_counts:
-        tokenizer_dict["NNP"] = (current_index, current_index + allocation_for_NNP)
-        current_index += allocation_for_NNP
-
-    # Step 6: Finalize vocabulary size
-    global vocab_size
-    vocab_size = current_index
     print("POS tags and their corresponding integer ranges:")
     for pos_tag, (start, end) in tokenizer_dict.items():
         print(f"{pos_tag}: {start}-{end}")
+
+    global vocab_size
+    vocab_size = current_index
     print(f"Vocabulary size: {vocab_size:,}")
 
-    if vocab_size > MAX_VOCAB_SIZE - 1:
+    if vocab_size >= MAX_VOCAB_SIZE:
         raise ValueError(
-            f"Vocabulary size {vocab_size} exceeds maximum allowed size of {MAX_VOCAB_SIZE - 1}"
+            f"Vocabulary size {vocab_size} exceeds maximum allowed size of {MAX_VOCAB_SIZE}"
         )
 
     return tokenizer_dict
