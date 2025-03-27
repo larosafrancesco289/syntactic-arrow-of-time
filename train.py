@@ -164,20 +164,21 @@ meta_vocab_size = None
 if os.path.exists(meta_path):
     with open(meta_path, "rb") as f:
         meta = pickle.load(f)
-    meta_vocab_size = meta["vocab_size"]
-    print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
+    base_vocab_size = meta["vocab_size"]
+    print(f"found vocab_size = {base_vocab_size} (inside {meta_path})")
+    meta_vocab_size = base_vocab_size + 1  # Add 1 for the BOS token
 
 train_dataset = POSDataset(
     os.path.join(data_dir, "train.bin"),
     block_size,
-    vocab_size=meta_vocab_size,
+    vocab_size=base_vocab_size,
     backwards=backwards,
     stride=stride,
 )
 val_dataset = POSDataset(
     os.path.join(data_dir, "val.bin"),
     block_size,
-    vocab_size=meta_vocab_size,
+    vocab_size=base_vocab_size,
     backwards=backwards,
     stride=stride,
 )

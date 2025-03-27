@@ -36,7 +36,7 @@ beta2 = 0.99
 warmup_iters = 300  # Since it's a larger run, we can afford to warm up a bit more
 
 # Use epochs
-train_on_epochs = False  # whether to train for a number of epochs instead of max_iters
+train_on_epochs = True  # whether to train for a number of epochs instead of max_iters
 num_epochs = 2  # number of epochs to train for, if train_on_epochs is True
 
 # Learning rate scheduler
