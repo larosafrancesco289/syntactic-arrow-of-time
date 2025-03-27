@@ -112,16 +112,6 @@ config_keys = [
 exec(open("configurator.py").read())  # overrides from command line or config file
 config = {k: globals()[k] for k in config_keys}  # will be useful for logging
 # -----------------------------------------------------------------------------
-# Compute milestones for learning rate scheduler phases
-if decay_lr:
-    cooldown_iters = int(cooldown_fraction * max_iters)
-    if cooldown_iters <= 0:
-        cooldown_iters = 0
-    start_cooldown = max_iters - cooldown_iters
-else:
-    cooldown_iters = 0
-    start_cooldown = max_iters
-# -----------------------------------------------------------------------------
 # various inits, derived attributes, I/O setup
 ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
 if ddp:
@@ -200,6 +190,16 @@ if train_on_epochs:
         print(
             f"Training for {num_epochs} epochs, with {iterations_per_epoch} iterations per epoch, total iterations: {max_iters}"
         )
+
+# Compute milestones for learning rate scheduler phases
+if decay_lr:
+    cooldown_iters = int(cooldown_fraction * max_iters)
+    if cooldown_iters <= 0:
+        cooldown_iters = 0
+    start_cooldown = max_iters - cooldown_iters
+else:
+    cooldown_iters = 0
+    start_cooldown = max_iters
 
 
 def get_batch(split):
