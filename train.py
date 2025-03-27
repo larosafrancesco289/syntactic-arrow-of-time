@@ -99,6 +99,10 @@ cooldown_fraction = (
 cooldown_type = "linear"  # 'linear' or '1-sqrt' for cooldown decay function
 min_lr = 0.0  # minimum learning rate at end of cooldown (paper often uses 0)
 lr_decay_iters = 600000  # not used in constant+cooldown but kept for compatibility
+
+# Training settings
+train_on_epochs = False  # whether to train for a number of epochs instead of max_iters
+num_epochs = 1  # number of epochs to train for, if train_on_epochs is True
 # -----------------------------------------------------------------------------
 config_keys = [
     k
@@ -187,6 +191,15 @@ val_loader = DataLoader(
 # Create iterators
 train_iter = iter(train_loader)
 val_iter = iter(val_loader)
+
+# Add this after creating the DataLoaders and iterators, before the model initialization
+if train_on_epochs:
+    iterations_per_epoch = len(train_loader)
+    max_iters = num_epochs * iterations_per_epoch
+    if master_process:
+        print(
+            f"Training for {num_epochs} epochs, with {iterations_per_epoch} iterations per epoch, total iterations: {max_iters}"
+        )
 
 
 def get_batch(split):

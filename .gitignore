@@ -69,3 +69,24 @@ Thumbs.db
 /out-shakespeare_pos_id
 /out-shakespeare_char
 /out-shakespeare_pos_range
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+ENV/
+.env/
+virtualenv/
+.pytest_cache/
+.coverage.*
+*.so
+
+# Additional logs
+logs/
+*.log.*
+
+# Local development
+.local/

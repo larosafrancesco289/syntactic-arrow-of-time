@@ -1,5 +1,5 @@
 # train_mini.py
-out_dir = "out-shakespeare_pos_range_mini"
+out_dir = "out-train_id_mini"
 eval_interval = 250
 eval_iters = 20
 log_interval = 1
@@ -10,10 +10,10 @@ always_save_checkpoint = False
 # Logging
 wandb_log = False
 wandb_project = "semester-project-gpu"
-wandb_run_name = "shakespeare_pos_range_mini"
+wandb_run_name = "openwebtext_id_mini"
 
 # Dataset
-dataset = "shakespeare_pos_range"
+dataset = "openwebtext_id"
 # We are forcing the same effective batch size as GPT1:
 batch_size = 64
 gradient_accumulation_steps = 2
@@ -32,7 +32,11 @@ max_iters = 2000
 lr_decay_iters = 2000
 min_lr = 0.0
 beta2 = 0.99
-warmup_iters = 100
+warmup_iters = 300  # Since it's a larger run, we can afford to warm up a bit more
+
+# Use epochs
+train_on_epochs = False  # whether to train for a number of epochs instead of max_iters
+num_epochs = 2  # number of epochs to train for, if train_on_epochs is True
 
 # Learning rate scheduler
 decay_lr = True

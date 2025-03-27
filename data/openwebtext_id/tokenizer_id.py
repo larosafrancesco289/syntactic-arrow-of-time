@@ -213,6 +213,12 @@ def main():
     print(f"Train has {len(train_tokenized):,} tokens")
     print(f"Val has {len(val_tokenized):,} tokens")
 
+    # Print some examples
+    print("Example tokens:")
+    for i in range(10):
+        print(f"Train: {train_tokenized[i]} -> {train_pos_tags[i]}")
+        print(f"Val: {val_tokenized[i]} -> {val_pos_tags[i]}")
+
     # Save to binary files for efficient storage and loading using uint16
     train_tokenized = np.array(train_tokenized, dtype=np.uint16)  # Changed to uint16
     val_tokenized = np.array(val_tokenized, dtype=np.uint16)  # Changed to uint16
