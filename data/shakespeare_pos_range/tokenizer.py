@@ -14,51 +14,6 @@ from torch.utils.data import Dataset
 vocab_size = 0
 
 
-class POSDataset(Dataset):
-    """
-    PyTorch Dataset for part-of-speech tokenized data, supporting both forward and backward sequences.
-    """
-
-    def __init__(self, file_path, block_size, backwards=False):
-        """
-        Args:
-            file_path (str): Path to binary file with tokenized data
-            block_size (int): Number of tokens in a sequence
-            backwards (bool): Whether to return sequences in reverse order
-        """
-        self.block_size = block_size
-        self.backwards = backwards
-
-        # Load data using memmap to handle large files efficiently
-        self.data = np.memmap(file_path, dtype=np.uint16, mode="r")
-
-    def __len__(self):
-        return len(self.data) - self.block_size
-
-    def __getitem__(self, idx):
-        chunk = self.data[idx : idx + self.block_size]  # (blocksize,)
-
-        if self.backwards:
-            # For reverse-direction model: reverse the chunk and append BOS
-            chunk = chunk[::-1]  # Reverse the chunk
-            # Append BOS token at the end
-            chunk_bos = np.append(chunk, vocab_size)  # (blocksize+1,)
-            x = chunk_bos[:-1]  # (blocksize,)
-            y = chunk_bos[1:]  # (blocksize,)
-        else:
-            # For forward-direction model: prepend BOS to the chunk
-            # Prepend BOS token at the beginning
-            chunk_bos = np.append(np.array([vocab_size]), chunk)  # (blocksize+1,)
-            x = chunk_bos[:-1]  # (blocksize,)
-            y = chunk_bos[1:]  # (blocksize,)
-
-        # Convert NumPy arrays to PyTorch tensors
-        x = torch.from_numpy(x.astype(np.int64))
-        y = torch.from_numpy(y.astype(np.int64))
-
-        return x, y
-
-
 def download_dataset():
     """
     Downloads the tiny Shakespeare dataset if not locally available.

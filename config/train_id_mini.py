@@ -18,6 +18,7 @@ dataset = "openwebtext_id"
 batch_size = 64
 gradient_accumulation_steps = 2
 block_size = 64
+stride = 32
 
 # Model hyperparameters (mini):
 n_layer = 6  # layers

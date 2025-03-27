@@ -30,7 +30,7 @@ from torch.distributed import init_process_group, destroy_process_group
 from model import GPTConfig, GPT
 
 # Import POSDataset from the tokenizer module
-from data.shakespeare_pos_range.tokenizer import POSDataset
+from dataloader import POSDataset
 from torch.utils.data import DataLoader
 
 # Learning rate imports
@@ -98,6 +98,7 @@ cooldown_fraction = (
 )
 cooldown_type = "linear"  # 'linear' or '1-sqrt' for cooldown decay function
 min_lr = 0.0  # minimum learning rate at end of cooldown (paper often uses 0)
+stride = 1  # how many tokens to skip between chunks
 lr_decay_iters = 600000  # not used in constant+cooldown but kept for compatibility
 
 # Training settings
@@ -157,12 +158,28 @@ ctx = (
 data_dir = os.path.join("data", dataset)
 print(f"using data from {data_dir}")
 
-# Create datasets and DataLoaders
+# attempt to derive vocab_size from the dataset
+meta_path = os.path.join(data_dir, "meta.pkl")
+meta_vocab_size = None
+if os.path.exists(meta_path):
+    with open(meta_path, "rb") as f:
+        meta = pickle.load(f)
+    meta_vocab_size = meta["vocab_size"]
+    print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
+
 train_dataset = POSDataset(
-    os.path.join(data_dir, "train.bin"), block_size, backwards=backwards
+    os.path.join(data_dir, "train.bin"),
+    block_size,
+    vocab_size=meta_vocab_size,
+    backwards=backwards,
+    stride=stride,
 )
 val_dataset = POSDataset(
-    os.path.join(data_dir, "val.bin"), block_size, backwards=backwards
+    os.path.join(data_dir, "val.bin"),
+    block_size,
+    vocab_size=meta_vocab_size,
+    backwards=backwards,
+    stride=stride,
 )
 
 train_loader = DataLoader(
@@ -243,15 +260,6 @@ def get_batch(split):
 # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
 iter_num = 0
 best_val_loss = 1e9
-
-# attempt to derive vocab_size from the dataset
-meta_path = os.path.join(data_dir, "meta.pkl")
-meta_vocab_size = None
-if os.path.exists(meta_path):
-    with open(meta_path, "rb") as f:
-        meta = pickle.load(f)
-    meta_vocab_size = meta["vocab_size"]
-    print(f"found vocab_size = {meta_vocab_size} (inside {meta_path})")
 
 # model init
 model_args = dict(
