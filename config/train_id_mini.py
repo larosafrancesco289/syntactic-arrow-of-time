@@ -15,8 +15,8 @@ wandb_run_name = "openwebtext_id_mini"
 # Dataset
 dataset = "openwebtext_id"
 # We are forcing the same effective batch size as GPT1:
-batch_size = 64
-gradient_accumulation_steps = 2
+batch_size = 128
+gradient_accumulation_steps = 1
 block_size = 64
 stride = 32
 
