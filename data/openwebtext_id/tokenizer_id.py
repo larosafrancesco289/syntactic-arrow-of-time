@@ -81,7 +81,7 @@ def extract_pos_tags(text):
     all_tokens = []
     print("Extracting words and part-of-speech tags...")
     # Process each chunk through the NLP pipeline with n_process=-1 to use all available CPU cores
-    for doc in tqdm(nlp.pipe(chunks, n_process=-1, batch_size=5000), total=len(chunks)):
+    for doc in tqdm(nlp.pipe(chunks, n_process=20, batch_size=5000), total=len(chunks)):
         all_tokens.extend([(token.text, token.tag_) for token in doc])
     return all_tokens
 
