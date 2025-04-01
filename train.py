@@ -34,7 +34,6 @@ from dataloader import POSDataset
 from torch.utils.data import DataLoader
 
 # Learning rate imports
-import math
 from torch.optim.lr_scheduler import SequentialLR, LinearLR, ConstantLR, LambdaLR
 
 # -----------------------------------------------------------------------------
@@ -99,7 +98,6 @@ cooldown_fraction = (
 cooldown_type = "linear"  # 'linear' or '1-sqrt' for cooldown decay function
 min_lr = 0.0  # minimum learning rate at end of cooldown (paper often uses 0)
 stride = 1  # how many tokens to skip between chunks
-lr_decay_iters = 600000  # not used in constant+cooldown but kept for compatibility
 
 # Training settings
 train_on_epochs = False  # whether to train for a number of epochs instead of max_iters
@@ -247,7 +245,7 @@ def get_batch(split):
             val_iter = iter(val_loader)
             x, y = next(val_iter)
 
-    # The dataset class already handles moving to device with pin_memory
+    # pin_memory=True enables faster async host-to-device transfers via non_blocking=True
     if device_type == "cuda":
         x = x.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
@@ -431,8 +429,7 @@ raw_model = model.module if ddp else model  # unwrap DDP container if needed
 running_mfu = -1.0
 while True:
 
-    # Update learning rate using the scheduler
-    lr_scheduler.step()
+    # Get the learning rate *before* the optimizer step for logging this iteration's LR
     lr = optimizer.param_groups[0]["lr"]  # For logging
 
     # evaluate the loss on train/val sets and write checkpoints
@@ -494,6 +491,10 @@ while True:
     # step the optimizer and scaler if training in fp16
     scaler.step(optimizer)
     scaler.update()
+
+    # Update learning rate using the scheduler *after* the optimizer step
+    lr_scheduler.step()
+
     # flush the gradients as soon as we can, no need for this memory anymore
     optimizer.zero_grad(set_to_none=True)
 

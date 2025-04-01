@@ -1,15 +1,15 @@
 # train_mini.py
 out_dir = "out-train_id_mini"
-eval_interval = 250
-eval_iters = 20
-log_interval = 1
+eval_interval = 2000
+eval_iters = 200
+log_interval = 10
 
 # We'll still only save when val improves
 always_save_checkpoint = False
 
 # Logging
 wandb_log = False
-wandb_project = "semester-project-gpu"
+wandb_project = "semester-project-id"
 wandb_run_name = "openwebtext_range_mini"
 
 # Dataset

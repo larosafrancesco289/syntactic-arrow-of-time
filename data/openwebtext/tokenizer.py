@@ -210,10 +210,10 @@ def main():
 
     pos_tags = [pos_tag for word, pos_tag in all_tokens]
 
-    # Split into train and validation sets (90/10 split)
+    # Split into train and validation sets (95/5 split)
     n = len(pos_tags)
-    train_pos_tags = pos_tags[: int(n * 0.9)]
-    val_pos_tags = pos_tags[int(n * 0.9) :]
+    train_pos_tags = pos_tags[: int(n * 0.95)]
+    val_pos_tags = pos_tags[int(n * 0.95) :]
 
     # Tokenize the POS tags into integers
     print("Tokenizing training data...")
@@ -227,9 +227,8 @@ def main():
 
     # Print some examples
     print("Example tokens:")
-    for i in range(10):
+    for i in range(20):
         print(f"Train: {train_tokenized[i]} -> {train_pos_tags[i]}")
-        print(f"Val: {val_tokenized[i]} -> {val_pos_tags[i]}")
 
     # Save to binary files for efficient storage and loading using uint16
     train_tokenized = np.array(train_tokenized, dtype=np.uint16)  # Changed to uint16
