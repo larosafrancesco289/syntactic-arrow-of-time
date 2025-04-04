@@ -180,7 +180,10 @@ def main():
     val_tokenized.tofile(os.path.join(os.path.dirname(__file__), "val.bin"))
 
     # Save metadata with vocabulary size for model training
-    meta = {"vocab_size": vocab_size}
+    meta = {
+        "vocab_size": vocab_size,  # Number of unique IDs used (0 to vocab_size-1)
+        "tokenizer_dict": tokenizer_dict,  # Mapping of POS tags to integers
+    }
     with open(os.path.join(os.path.dirname(__file__), "meta.pkl"), "wb") as f:
         pickle.dump(meta, f)
 

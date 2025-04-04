@@ -1,39 +1,38 @@
-# train_mini.py
-out_dir = "out-train_range_mini"
+# train_gpt1.py
+out_dir = "out-train_id_gpt1"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
 
-# We'll still only save when val improves
 always_save_checkpoint = False
 
 # Logging
 wandb_log = False
-wandb_project = "semester-project-id"
-wandb_run_name = "openwebtext_range_mini"
+wandb_project = "semester-project-gpt1"
+wandb_run_name = "openwebtext_id_gpt1"
 
 # Dataset
-dataset = "openwebtext"
-# We are forcing the same effective batch size as GPT1:
+dataset = "openwebtext_id"
+# GPT1 is our limiting model. Suppose we fit batch_size=64, then do accumulation:
 batch_size = 128
 gradient_accumulation_steps = 1
 block_size = 64
 stride = 32
 
-# Model hyperparameters (mini):
-n_layer = 6  # layers
-n_head = 6  # attention heads
-n_embd = 192  # embedding dimension
+# Model hyperparameters (GPT1):
+n_layer = 12
+n_head = 12
+n_embd = 768
 dropout = 0.0
-# feedforward dimension implicitly 4 * n_embd inside the model code
+# feedforward dimension = 4 * n_embd
 
 # Optimizer hyperparameters
-learning_rate = 1e-4  # same as all models
+learning_rate = 1e-4
 max_iters = 2000
 lr_decay_iters = 2000
 min_lr = 0.0
 beta2 = 0.99
-warmup_iters = 300  # Since it's a larger run, we can afford to warm up a bit more
+warmup_iters = 300
 
 # Use epochs
 train_on_epochs = True  # whether to train for a number of epochs instead of max_iters

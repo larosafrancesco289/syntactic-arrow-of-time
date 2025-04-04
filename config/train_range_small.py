@@ -1,5 +1,5 @@
 # train_small.py
-out_dir = "out-shakespeare_pos_range_small"
+out_dir = "out-train_range_small"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
@@ -9,7 +9,7 @@ always_save_checkpoint = False
 # Logging
 wandb_log = False
 wandb_project = "semester-project-small"
-wandb_run_name = "shakespeare_pos_range_small"
+wandb_run_name = "openwebtext_range_small"
 
 # Dataset
 dataset = "openwebtext"
