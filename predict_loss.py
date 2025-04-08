@@ -21,7 +21,7 @@ ID_MODEL_BACKWARDS = False
 
 # --- Validation Loss of the *trained* ID Model ---
 # Replace this with the actual final validation loss you recorded
-L_id_observed = 3.14159  # <<<--- IMPORTANT: SET THIS VALUE
+L_id_observed = 2.035  # <<<--- IMPORTANT: SET THIS VALUE
 
 # --- Paths related to the Bigger Model ---
 BIGGER_MODEL_DATA_DIR = (
@@ -46,9 +46,7 @@ def calculate_estimated_loss():
         )
     with open(ID_MODEL_META_PATH, "rb") as f:
         meta_id = pickle.load(f)
-    tokenizer_dict_id = meta_id.get(
-        "tokenizer_dict"
-    )  # Assuming dict is stored under this key
+    tokenizer_dict_id = meta_id.get("tokenizer_dict")
     id_model_vocab_size = meta_id.get("vocab_size")
     if tokenizer_dict_id is None or id_model_vocab_size is None:
         raise ValueError(
@@ -65,9 +63,7 @@ def calculate_estimated_loss():
         )
     with open(BIGGER_MODEL_META_PATH, "rb") as f:
         meta_big = pickle.load(f)
-    tokenizer_dict_big = meta_big.get(
-        "tokenizer_dict"
-    )  # Assuming dict is stored under this key
+    tokenizer_dict_big = meta_big.get("tokenizer_dict")
     if tokenizer_dict_big is None:
         raise ValueError(
             f"Metadata file {BIGGER_MODEL_META_PATH} must contain 'tokenizer_dict'"
@@ -78,10 +74,6 @@ def calculate_estimated_loss():
     print("Inverting ID tokenizer mapping (ID -> POS tag string)...")
     try:
         id_to_pos_tag = {v: k for k, v in tokenizer_dict_id.items()}
-        # Add mapping for potential BOS token if it was explicitly part of the dict
-        # (Based on your ID tokenizer, BOS is likely implicit or handled by vocab_size)
-        # If BOS was ID `id_model_vocab_size`, add a placeholder if needed, but it usually won't be a target
-        # id_to_pos_tag[id_model_vocab_size] = "BOS" # Optional, depends if BOS can be a target
     except Exception as e:
         print(f"Error inverting ID tokenizer: {e}")
         print("Ensure tokenizer_dict_id contains unique integer values.")
@@ -230,6 +222,4 @@ def calculate_estimated_loss():
 
 
 if __name__ == "__main__":
-    # Make sure the POSDataset class definition is available above this line
-    # or imported correctly.
     calculate_estimated_loss()
