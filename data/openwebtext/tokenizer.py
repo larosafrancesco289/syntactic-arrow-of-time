@@ -202,8 +202,8 @@ def main():
     5. Convert POS tags to integer tokens
     6. Save tokenized data and metadata to disk
     """
-    # Load ~1GB of OpenWebText
-    data = load_openwebtext_subset(target_size_gb=1)
+    # Load ~2GB of OpenWebText
+    data = load_openwebtext_subset(target_size_gb=2)
 
     all_tokens = extract_pos_tags(data)
     tokenizer_dict = create_tokenizer_dict(all_tokens)

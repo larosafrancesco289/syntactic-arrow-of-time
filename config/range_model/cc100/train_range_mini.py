@@ -1,5 +1,5 @@
 # train_mini.py
-out_dir = "out-train_id_mini"
+out_dir = "out/cc100_mini"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
@@ -8,12 +8,12 @@ log_interval = 10
 always_save_checkpoint = False
 
 # Logging
-wandb_log = False
-wandb_project = "semester-project-id"
-wandb_run_name = "openwebtext_id_mini"
+wandb_log = True
+wandb_project = "semester-project-all"
+wandb_run_name = "cc100_mini"
 
 # Dataset
-dataset = "openwebtext_id"
+dataset = "cc100"
 # We are forcing the same effective batch size as GPT1:
 batch_size = 128
 gradient_accumulation_steps = 1
@@ -37,7 +37,7 @@ warmup_iters = 300  # Since it's a larger run, we can afford to warm up a bit mo
 
 # Use epochs
 train_on_epochs = True  # whether to train for a number of epochs instead of max_iters
-num_epochs = 2  # number of epochs to train for, if train_on_epochs is True
+num_epochs = 1  # number of epochs to train for, if train_on_epochs is True
 
 # Learning rate scheduler
 decay_lr = True

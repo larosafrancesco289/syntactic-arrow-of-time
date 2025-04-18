@@ -117,92 +117,36 @@ def extract_pos_tags(text):
 
 def create_tokenizer_dict(all_tokens):
     """
-    Creates a dictionary mapping POS tags to unique integer ranges.
-
-    Assigns a continuous range of integers to each POS tag based on the number of
-    unique words, with 'NNP' capped at 2000 tokens before scaling others.
+    Creates a dictionary mapping each unique POS tag to a unique integer.
 
     Args:
         all_tokens (list): List of (word, POS tag) tuples
 
     Returns:
-        dict: Dictionary mapping POS tags to (start, end) integer ranges
+        dict: Dictionary mapping POS tags to unique integers
     """
-    # Step 1: Collect unique words per POS tag
-    pos_to_unique_words = defaultdict(set)
-    for word, pos_tag in all_tokens:
-        pos_to_unique_words[pos_tag].add(word)
-
-    unique_word_counts = {
-        pos_tag: len(words) for pos_tag, words in pos_to_unique_words.items()
-    }
-
-    # Step 2: Handle 'NNP' allocation
-    if "NNP" in unique_word_counts:
-        actual_unique_NNP = unique_word_counts["NNP"]
-        allocation_for_NNP = min(2000, actual_unique_NNP)
-    else:
-        allocation_for_NNP = 0
-
-    # Step 3: Process other POS tags
-    other_pos_tags = [pos_tag for pos_tag in unique_word_counts if pos_tag != "NNP"]
-    sorted_other_pos_tags = sorted(other_pos_tags, key=lambda x: unique_word_counts[x])
-
-    # Calculate total unique words for other POS tags
-    total_other_unique = sum(unique_word_counts[pos_tag] for pos_tag in other_pos_tags)
-
-    # Step 4: Calculate scaling factor for other tags
-    remaining = MAX_VOCAB_SIZE - 1 - allocation_for_NNP  # Reserve 1 for BOS
-    if total_other_unique > remaining and total_other_unique > 0:
-        scaling_factor = remaining / total_other_unique
-        print(
-            f"Scaling non-NNP vocabulary by factor of {scaling_factor:.4f} to fit within limit"
-        )
-    else:
-        scaling_factor = 1.0
-
-    # Step 5: Assign ranges
-    tokenizer_dict = {}
-    current_index = 0
-
-    # Assign ranges to other POS tags
-    for pos_tag in sorted_other_pos_tags:
-        num_unique = max(1, int(unique_word_counts[pos_tag] * scaling_factor))
-        tokenizer_dict[pos_tag] = (current_index, current_index + num_unique)
-        current_index += num_unique
-
-    # Assign range to 'NNP' if present
-    if "NNP" in unique_word_counts:
-        tokenizer_dict["NNP"] = (current_index, current_index + allocation_for_NNP)
-        current_index += allocation_for_NNP
-
-    # Step 6: Finalize vocabulary size
+    unique_pos_tags = sorted(set(pos_tag for word, pos_tag in all_tokens))
+    tokenizer_dict = {pos_tag: idx for idx, pos_tag in enumerate(unique_pos_tags)}
     global vocab_size
-    vocab_size = current_index
-    print("POS tags and their corresponding integer ranges:")
-    for pos_tag, (start, end) in tokenizer_dict.items():
-        print(f"{pos_tag}: {start}-{end}")
+    vocab_size = len(unique_pos_tags)
+    print("POS tags and their corresponding integers:")
+    for pos_tag, token_id in tokenizer_dict.items():
+        print(f"{pos_tag}: {token_id}")
     print(f"Vocabulary size: {vocab_size:,}")
-
     if vocab_size > MAX_VOCAB_SIZE - 1:
         raise ValueError(
             f"Vocabulary size {vocab_size} exceeds maximum allowed size of {MAX_VOCAB_SIZE - 1}"
         )
-
     return tokenizer_dict
 
 
 def tokenize_pos_tags(pos_tags, tokenizer_dict):
     """
-    Tokenizes each part-of-speech tag into a random integer from its assigned range.
-
-    For each POS tag, selects a random integer from the range corresponding to that tag
-    in the tokenizer dictionary. This creates an integer representation where the value's
-    range indicates the grammatical function.
+    Tokenizes each part-of-speech tag into its assigned unique integer.
 
     Args:
         pos_tags (list): List of part-of-speech tags
-        tokenizer_dict (dict): Dictionary mapping POS tags to integer ranges
+        tokenizer_dict (dict): Dictionary mapping POS tags to integers
 
     Returns:
         list: List of integer tokens representing the input tags
@@ -210,8 +154,7 @@ def tokenize_pos_tags(pos_tags, tokenizer_dict):
     tokenized = []
     for pos_tag in pos_tags:
         if pos_tag in tokenizer_dict:
-            start, end = tokenizer_dict[pos_tag]
-            token_id = random.randint(start, end - 1)
+            token_id = tokenizer_dict[pos_tag]
             tokenized.append(token_id)
         else:
             print(f"Warning: Unknown POS tag '{pos_tag}'")
@@ -226,7 +169,7 @@ def main():
     Steps:
     1. Read the CC100 dataset
     2. Extract part-of-speech tags using spaCy
-    3. Create a tokenizer dictionary mapping POS tags to integer ranges
+    3. Create a tokenizer dictionary mapping POS tags to integers
     4. Split data into training and validation sets
     5. Convert POS tags to integer tokens
     6. Save tokenized data and metadata to disk
@@ -268,7 +211,7 @@ def main():
     # Save metadata with vocabulary size for model training
     meta = {
         "vocab_size": vocab_size,  # Number of unique IDs used (0 to vocab_size-1)
-        "tokenizer_dict": tokenizer_dict,  # Mapping of POS tags to integer ranges
+        "tokenizer_dict": tokenizer_dict,  # Mapping of POS tags to integers
     }
     with open(os.path.join(os.path.dirname(__file__), "meta.pkl"), "wb") as f:
         pickle.dump(meta, f)

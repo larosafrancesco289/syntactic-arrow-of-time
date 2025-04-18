@@ -1,5 +1,5 @@
 # train_gpt1.py
-out_dir = "out-train_id_nano"
+out_dir = "out/cc100_id_gpt1"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
@@ -7,22 +7,22 @@ log_interval = 10
 always_save_checkpoint = False
 
 # Logging
-wandb_log = False
-wandb_project = "semester-project-nano"
-wandb_run_name = "openwebtext_id_nano128_backward"
+wandb_log = True
+wandb_project = "semester-project-all"
+wandb_run_name = "cc100_id_gpt1"
 
 # Dataset
-dataset = "openwebtext_id"
+dataset = "cc100_id"
 # GPT1 is our limiting model. Suppose we fit batch_size=64, then do accumulation:
 batch_size = 128
 gradient_accumulation_steps = 1
-block_size = 128
-stride = block_size // 2
+block_size = 64
+stride = 32
 
-# Model hyperparameters (nano):
-n_layer = 3
-n_head = 3
-n_embd = 48
+# Model hyperparameters (GPT1):
+n_layer = 12
+n_head = 12
+n_embd = 768
 dropout = 0.0
 # feedforward dimension = 4 * n_embd
 
@@ -43,7 +43,7 @@ decay_lr = True
 cooldown_fraction = 0.1
 cooldown_type = "linear"
 
-backwards = True
+backwards = False
 
 # Device settings
 device = "cuda"

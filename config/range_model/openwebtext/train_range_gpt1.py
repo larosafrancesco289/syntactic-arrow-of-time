@@ -1,5 +1,5 @@
-# train_small.py
-out_dir = "out-train_range_small"
+# train_gpt1.py
+out_dir = "out/openwebtext_gpt1"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
@@ -7,27 +7,27 @@ log_interval = 10
 always_save_checkpoint = False
 
 # Logging
-wandb_log = False
-wandb_project = "semester-project-small"
-wandb_run_name = "openwebtext_range_small"
+wandb_log = True
+wandb_project = "semester-project-all"
+wandb_run_name = "openwebtext_gpt1"
 
 # Dataset
 dataset = "openwebtext"
-# We are forcing the same effective batch size as GPT1:
+# GPT1 is our limiting model. Suppose we fit batch_size=64, then do accumulation:
 batch_size = 128
 gradient_accumulation_steps = 1
 block_size = 64
 stride = 32
 
-# Model hyperparameters (small):
-n_layer = 10
-n_head = 10
-n_embd = 380
+# Model hyperparameters (GPT1):
+n_layer = 12
+n_head = 12
+n_embd = 768
 dropout = 0.0
-# feedforward dimension = 4 * n_embd (inside model code)
+# feedforward dimension = 4 * n_embd
 
 # Optimizer hyperparameters
-learning_rate = 1e-4  # same across models
+learning_rate = 1e-4
 max_iters = 2000
 lr_decay_iters = 2000
 min_lr = 0.0
@@ -36,7 +36,7 @@ warmup_iters = 300
 
 # Use epochs
 train_on_epochs = True  # whether to train for a number of epochs instead of max_iters
-num_epochs = 2  # number of epochs to train for, if train_on_epochs is True
+num_epochs = 1  # number of epochs to train for, if train_on_epochs is True
 
 # Learning rate scheduler
 decay_lr = True

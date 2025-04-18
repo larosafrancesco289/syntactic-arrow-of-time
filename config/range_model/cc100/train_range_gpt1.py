@@ -1,5 +1,5 @@
 # train_gpt1.py
-out_dir = "out-train_range_nano"
+out_dir = "out/cc100_gpt1"
 eval_interval = 2000
 eval_iters = 200
 log_interval = 10
@@ -7,22 +7,22 @@ log_interval = 10
 always_save_checkpoint = False
 
 # Logging
-wandb_log = False
-wandb_project = "semester-project-nano"
-wandb_run_name = "openwebtext_range_nano16"
+wandb_log = True
+wandb_project = "semester-project-all"
+wandb_run_name = "cc100_gpt1"
 
 # Dataset
-dataset = "openwebtext"
+dataset = "cc100"
 # GPT1 is our limiting model. Suppose we fit batch_size=64, then do accumulation:
 batch_size = 128
 gradient_accumulation_steps = 1
-block_size = 16
-stride = 8
+block_size = 64
+stride = 32
 
-# Model hyperparameters (nano):
-n_layer = 3
-n_head = 3
-n_embd = 48
+# Model hyperparameters (GPT1):
+n_layer = 12
+n_head = 12
+n_embd = 768
 dropout = 0.0
 # feedforward dimension = 4 * n_embd
 
@@ -36,7 +36,7 @@ warmup_iters = 300
 
 # Use epochs
 train_on_epochs = True  # whether to train for a number of epochs instead of max_iters
-num_epochs = 2  # number of epochs to train for, if train_on_epochs is True
+num_epochs = 1  # number of epochs to train for, if train_on_epochs is True
 
 # Learning rate scheduler
 decay_lr = True
