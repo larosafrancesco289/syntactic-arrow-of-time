@@ -9,7 +9,9 @@ import numpy as np
 import pickle
 import torch
 from torch.utils.data import Dataset
-import lzma
+import lzma 
+from pathlib import Path 
+from datasets import load_dataset
 
 # Maximum vocabulary size for 16-bit representation
 MAX_VOCAB_SIZE = 65535  # 2^16 - 1
@@ -17,107 +19,33 @@ MAX_VOCAB_SIZE = 65535  # 2^16 - 1
 # Global variable to store the total vocabulary size
 vocab_size = 0
 
-
-# Remove or comment out the entire load_openwebtext_subset function
-
-
-def load_cc100_subset(file_path, target_size_gb=1):
+def load_cc100_subset(file_path: str | Path, target_size_gb: float = 1.0) -> str:
     """
-    Loads a subset of the local CC100 dataset (en.txt.xz).
-    Returns the raw text as a single string.
+    Streams (decompresses on the fly) text from a local CC100 shard
+    stored as an .xz file, until `target_size_gb` of *uncompressed*
+    UTF8 bytes have been collected.
 
-    Args:
-        file_path (str): The path to the en.txt.xz file.
-        target_size_gb (float): The approximate target size in gigabytes.
-
-    Returns:
-        str: The loaded text data as a single string, or empty string on error.
+    Returns the text joined by double newlines.
     """
-    if not os.path.exists(file_path):
-        print(f"Error: File not found at {file_path}")
-        return ""
+    target_bytes = int(target_size_gb * 1_000_000_000)
+    text_parts   = []
+    total        = 0
 
-    target_size_bytes = target_size_gb * 10**9
-    text_data = []
-    total_size_bytes = 0
-    chunk_size = 1024 * 1024  # Read 1MB chunks (of characters) at a time
+    # lzma.open(..., 'rt') → transparent decompression + text mode
+    with lzma.open(file_path, mode="rt", encoding="utf‑8", errors="ignore") as f:
+        for line in f:                       # iterate line‑by‑line (constant memory)
+            b = len(line.encode("utf‑8"))    # cost of the *decoded* line
+            if total + b > target_bytes:     # stop exactly at the user quota
+                keep = target_bytes - total
+                text_parts.append(line[:keep])     # clip final partial line
+                total += keep
+                break
+            text_parts.append(line.rstrip("\n"))   # drop the single newline
+            total += b
 
-    print(f"Loading CC100 subset from {file_path}...")
-    try:
-        with lzma.open(file_path, "rt", encoding="utf-8", errors="ignore") as f:
-            with tqdm(
-                total=target_size_bytes, unit="B", unit_scale=True, desc="Reading CC100"
-            ) as pbar:
-                while total_size_bytes < target_size_bytes:
-                    chunk = f.read(chunk_size)
-                    if not chunk:
-                        break  # End of file
-
-                    # Estimate chunk byte size (encoding needed for accuracy)
-                    # For performance, we can approximate or calculate precisely
-                    chunk_bytes = len(chunk.encode("utf-8", errors="ignore"))
-
-                    # Check if adding the full chunk exceeds the target
-                    if total_size_bytes + chunk_bytes > target_size_bytes:
-                        # Estimate how much of the chunk to keep
-                        remaining_bytes = target_size_bytes - total_size_bytes
-                        # Calculate approximate character fraction
-                        # This is an estimation as char != byte in UTF-8
-                        fraction_to_keep = (
-                            remaining_bytes / chunk_bytes if chunk_bytes > 0 else 0
-                        )
-                        chars_to_keep = max(0, int(len(chunk) * fraction_to_keep))
-                        # Take a bit less initially to be safe, then refine
-                        estimated_chars = max(
-                            1, chars_to_keep - 10
-                        )  # Adjust buffer as needed
-                        chunk = chunk[:estimated_chars]
-
-                        # Refine by checking actual byte size iteratively
-                        chunk_bytes = len(chunk.encode("utf-8", errors="ignore"))
-                        while (
-                            total_size_bytes + chunk_bytes < target_size_bytes
-                            and estimated_chars < len(f.buffer)
-                        ):  # check if more chars available
-                            chunk += f.buffer[estimated_chars]
-                            estimated_chars += 1
-                            chunk_bytes = len(chunk.encode("utf-8", errors="ignore"))
-
-                        # Final trim if we overshot
-                        while (
-                            total_size_bytes + chunk_bytes > target_size_bytes
-                            and len(chunk) > 0
-                        ):
-                            chunk = chunk[:-1]  # Remove last character
-                            chunk_bytes = len(chunk.encode("utf-8", errors="ignore"))
-
-                    text_data.append(chunk)
-                    actual_bytes_added = chunk_bytes
-                    total_size_bytes += actual_bytes_added
-                    pbar.update(actual_bytes_added)
-
-                    if total_size_bytes >= target_size_bytes:
-                        # Ensure the progress bar reflects completion if we hit the target exactly or slightly overshot before truncation
-                        pbar.n = target_size_bytes
-                        pbar.last_print_n = target_size_bytes
-                        pbar.refresh()
-                        break  # Target reached
-
-    except lzma.LZMAError as e:
-        print(f"Error decompressing file: {e}")
-        return ""
-    except Exception as e:
-        print(f"Error reading file: {e}")
-        return ""
-
-    final_gb = total_size_bytes / 10**9
-    print(
-        f"\nLoaded approximately {final_gb:.2f} GB of text (target was {target_size_gb} GB)"
-    )
-    # Join the chunks into a single string.
-    # Assumes CC100 uses double newlines internally like OpenWebText examples.
-    # If not, the split in extract_pos_tags might behave differently.
-    return "".join(text_data)
+    gb = total / 1_000_000_000
+    print(f"Loaded {gb:.2f} GB from {file_path}")
+    return "\n\n".join(text_parts)           
 
 
 def read_data(text):
@@ -278,22 +206,8 @@ def main():
     5. Convert POS tags to integer tokens
     6. Save tokenized data and metadata to disk
     """
-    # Define the path to your local CC100 file
-    cc100_file_path = "path/to/your/en.txt.xz"
-
-    # Target size in GB for the subset to load
-    target_gb = 1
-
-    # Load CC100
-    print(f"Attempting to load data from: {os.path.abspath(cc100_file_path)}")
-    data = load_cc100_subset(cc100_file_path, target_size_gb=target_gb)
-
-    if not data:  # Handle case where loading failed (e.g., file not found)
-        print(
-            "Failed to load data. Please check the file path and ensure it's readable."
-        )
-        print(f"Looked for: {os.path.abspath(cc100_file_path)}")
-        return  # Exit if data loading failed
+    # Load ~1GB of CC100
+    data = load_cc100_subset("/home/larosa/en.txt.xz", target_size_gb=1)
 
     all_tokens = extract_pos_tags(data)
     tokenizer_dict = create_tokenizer_dict(all_tokens)
