@@ -94,7 +94,7 @@ def extract_pos_tags(text):
         list: List of (word, POS tag) tuples for each token in the text
     """
     nlp = spacy.load(
-        "en_core_web_sm",
+        "de_core_news_sm",
         disable=[
             "parser",
             "ner",
