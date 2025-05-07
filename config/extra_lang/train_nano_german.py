@@ -8,11 +8,11 @@ always_save_checkpoint = False
 
 # Logging
 wandb_log = True
-wandb_project = "semester-project-all"
+wandb_project = "semester-project-nano-test"
 wandb_run_name = "cc100_nano_german"
 
 # Dataset
-dataset = "cc100"
+dataset = "cc100_german"
 # GPT1 is our limiting model. Suppose we fit batch_size=64, then do accumulation:
 batch_size = 128
 gradient_accumulation_steps = 1
