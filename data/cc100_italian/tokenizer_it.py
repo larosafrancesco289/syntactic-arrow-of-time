@@ -94,7 +94,7 @@ def extract_pos_tags(text):
         list: List of (word, POS tag) tuples for each token in the text
     """
     nlp = spacy.load(
-        "de_core_news_sm",
+        "it_core_news_sm",
         disable=[
             "parser",
             "ner",
@@ -232,7 +232,7 @@ def main():
     6. Save tokenized data and metadata to disk
     """
     # Load ~2GB of CC100
-    data = load_cc100_subset("/raid/de.txt.xz", target_size_gb=2)
+    data = load_cc100_subset("/raid/it.txt.xz", target_size_gb=2)
 
     all_tokens = extract_pos_tags(data)
     tokenizer_dict = create_tokenizer_dict(all_tokens)

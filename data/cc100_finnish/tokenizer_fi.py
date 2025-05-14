@@ -232,7 +232,7 @@ def main():
     6. Save tokenized data and metadata to disk
     """
     # Load ~2GB of CC100
-    data = load_cc100_subset("/home/larosa/en.txt.xz", target_size_gb=2)
+    data = load_cc100_subset("/raid/fi.txt.xz", target_size_gb=2)
 
     all_tokens = extract_pos_tags(data)
     tokenizer_dict = create_tokenizer_dict(all_tokens)
