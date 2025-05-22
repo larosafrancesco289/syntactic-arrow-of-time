@@ -43,6 +43,17 @@ except ImportError:
 from data.cc100.tokenizer import load_cc100_subset, tokenize_pos_tags
 from model import GPT, GPTConfig
 
+# ────────────────────────────────────────────────────────────────────────────────
+# User configuration                                                            │
+# ────────────────────────────────────────────────────────────────────────────────
+# Fill in **absolute** paths that point at your local files.
+# Leave DEVICE to the default unless you want to force CPU.
+# ------------------------------------------------------------------------------
+CC100_SHARD = Path("/raid/en.txt.xz")
+CHECKPOINT_GPT1 = Path("out/cc100_gpt1/ckpt.pt")
+CHECKPOINT_NANO = Path("out/cc100_nano/ckpt.pt")
+META_PATH = Path("data/cc100/meta.pkl")
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 ######################################################################
 # Helpers
@@ -56,11 +67,11 @@ def load_tokeniser(meta_path: Path):
     return meta["tokenizer_dict"], int(meta["vocab_size"])
 
 
-def encode_sentence(sentence: str, nlp, tokenizer_dict):
-    """Return a list of integer token IDs for *one* sentence."""
+def encode_sentence(sentence: str, nlp, tokenizer_dict, bos_id):
     doc = nlp(sentence)
     pos_tags = [t.tag_ for t in doc]
-    return tokenize_pos_tags(pos_tags, tokenizer_dict)
+    ids = tokenize_pos_tags(pos_tags, tokenizer_dict)
+    return [bos_id] + ids
 
 
 def load_model(ckpt_path: Path, device: torch.device):
@@ -89,11 +100,30 @@ def sentence_loss(model: GPT, token_ids, device):
 def evaluate(model: GPT, sentences, nlp, tokenizer_dict, device):
     losses = []
     for sent in tqdm(sentences, desc="eval", ncols=80):
-        ids = encode_sentence(sent, nlp, tokenizer_dict)
+        ids = encode_sentence(sent, nlp, tokenizer_dict, BOS_ID)
         l = sentence_loss(model, ids, device)
         if l is not None:
             losses.append(l)
     return sum(losses) / len(losses)
+
+
+def evaluate_full_context(model: GPT, token_stream, device):
+    """Cross-entropy over one contiguous stream (no resets)."""
+    losses, n_tokens = 0.0, 0
+    block = model.config.block_size
+    # iterate over overlapping target pairs
+    for i in range(0, len(token_stream) - block - 1, block):
+        x = torch.tensor(
+            token_stream[i : i + block], dtype=torch.long, device=device
+        ).unsqueeze(0)
+        y = torch.tensor(
+            token_stream[i + 1 : i + block + 1], dtype=torch.long, device=device
+        ).unsqueeze(0)
+        with torch.no_grad():
+            _, loss = model(x, y)
+        losses += loss.item() * y.numel()
+        n_tokens += y.numel()
+    return losses / n_tokens
 
 
 ######################################################################
@@ -101,40 +131,39 @@ def evaluate(model: GPT, sentences, nlp, tokenizer_dict, device):
 ######################################################################
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--cc100_shard",
-        type=Path,
-        required=True,
-        help="Path to the local .xz shard of CC-100",
-    )
-    parser.add_argument("--checkpoint_gpt1", type=Path, required=True)
-    parser.add_argument("--checkpoint_nano", type=Path, required=True)
-    parser.add_argument(
-        "--meta_path",
-        type=Path,
-        required=True,
-        help="Path to meta.pkl that matches the training tokenizer",
-    )
-    parser.add_argument(
-        "--device", default="cuda" if torch.cuda.is_available() else "cpu"
-    )
-    args = parser.parse_args()
+def parse_args():
+    """Return argparse.Namespace overriding any globals supplied on the CLI."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--cc100_shard", type=Path)
+    parser.add_argument("--checkpoint_gpt1", type=Path)
+    parser.add_argument("--checkpoint_nano", type=Path)
+    parser.add_argument("--meta_path", type=Path)
+    parser.add_argument("--device")
+    args, _ = parser.parse_known_args()
+    return args
 
-    device = torch.device(args.device)
+
+def main():
+    # 0. Collect parameters -----------------------------------------------------
+    args = parse_args()
+    cc100_shard = args.cc100_shard or CC100_SHARD
+    checkpoint_gpt1 = args.checkpoint_gpt1 or CHECKPOINT_GPT1
+    checkpoint_nano = args.checkpoint_nano or CHECKPOINT_NANO
+    meta_path = args.meta_path or META_PATH
+    device = torch.device(args.device or DEVICE)
 
     # ------------------------------------------------------------------
     # 1. Data: 1 MB of CC-100, sentence-split
     # ------------------------------------------------------------------
     print("\n⇢ Loading 1 MB of CC-100 text ...")
-    text = load_cc100_subset(args.cc100_shard, target_size_gb=0.001)
+    text = load_cc100_subset(cc100_shard, target_size_gb=0.001)
 
     print("⇢ Splitting into sentences ...")
-    nlp_sent = spacy.load("en_core_web_sm")
+    nlp_sent = spacy.blank("en")
     # ensure we have a cheap sentenciser in the pipeline
     if "sentencizer" not in nlp_sent.pipe_names:
         nlp_sent.add_pipe("sentencizer")
+    nlp_sent.max_length = 10_000_000
     doc = nlp_sent(text)
     sentences = [s.text.strip() for s in doc.sents if s.text.strip()]
     print(f"   {len(sentences):,} sentences")
@@ -142,7 +171,9 @@ def main():
     # ------------------------------------------------------------------
     # 2. Tokeniser dictionary
     # ------------------------------------------------------------------
-    tokenizer_dict, vocab_size = load_tokeniser(args.meta_path)
+    tokenizer_dict, vocab_size = load_tokeniser(meta_path)
+    global BOS_ID
+    BOS_ID = vocab_size  # BOS token is the last in the vocab
 
     # Share the same spaCy object for POS-tagging (tagger only)
     nlp_tag = spacy.load(
@@ -160,29 +191,39 @@ def main():
     # 3. Models
     # ------------------------------------------------------------------
     print("\n⇢ Loading GPT-1 checkpoint …")
-    model_gpt1 = load_model(args.checkpoint_gpt1, device)
+    model_gpt1 = load_model(checkpoint_gpt1, device)
 
     print("⇢ Loading GPT-nano checkpoint …")
-    model_nano = load_model(args.checkpoint_nano, device)
+    model_nano = load_model(checkpoint_nano, device)
 
     # ------------------------------------------------------------------
     # 4. Evaluation
     # ------------------------------------------------------------------
+    # build one big stream (still includes the BOS before each sentence)
+    token_stream = [
+        t
+        for ids in (
+            encode_sentence(s, nlp_tag, tokenizer_dict, BOS_ID) for s in sentences
+        )
+        for t in ids
+    ]
+
     print("\n⇢ Evaluating GPT-1 …")
-    loss_gpt1 = evaluate(model_gpt1, sentences, nlp_tag, tokenizer_dict, device)
-    ppl_gpt1 = torch.exp(torch.tensor(loss_gpt1)).item()
+    loss_sent_gpt1 = evaluate(model_gpt1, sentences, nlp_tag, tokenizer_dict, device)
+    loss_full_gpt1 = evaluate_full_context(model_gpt1, token_stream, device)
 
     print("⇢ Evaluating GPT-nano …")
-    loss_nano = evaluate(model_nano, sentences, nlp_tag, tokenizer_dict, device)
-    ppl_nano = torch.exp(torch.tensor(loss_nano)).item()
+    loss_sent_nano = evaluate(model_nano, sentences, nlp_tag, tokenizer_dict, device)
+    loss_full_nano = evaluate_full_context(model_nano, token_stream, device)
 
     # ------------------------------------------------------------------
     # 5. Report
     # ------------------------------------------------------------------
-    print("\n================ RESULTS ================")
-    print(f"GPT-1    | cross-entropy {loss_gpt1:6.4f} | perplexity {ppl_gpt1:6.2f}")
-    print(f"GPT-nano | cross-entropy {loss_nano:6.4f} | perplexity {ppl_nano:6.2f}")
-    print("========================================\n")
+    print("\n================ RESULTS =================")
+    print("          |  sentence-avg |  full-context ")
+    print(f"GPT-1     | {loss_sent_gpt1:6.4f}      | {loss_full_gpt1:6.4f}")
+    print(f"GPT-nano  | {loss_sent_nano:6.4f}      | {loss_full_nano:6.4f}")
+    print("==========================================\n")
 
 
 if __name__ == "__main__":
