@@ -54,6 +54,7 @@ CHECKPOINT_GPT1 = Path("out/cc100_gpt1/ckpt.pt")
 CHECKPOINT_NANO = Path("out/cc100_nano/ckpt.pt")
 META_PATH = Path("data/cc100/meta.pkl")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+BACKWARDS = True  # evaluate right-to-left sequences
 
 ######################################################################
 # Helpers
@@ -67,11 +68,17 @@ def load_tokeniser(meta_path: Path):
     return meta["tokenizer_dict"], int(meta["vocab_size"])
 
 
-def encode_sentence(sentence: str, nlp, tokenizer_dict, bos_id):
+def encode_sentence(sentence, nlp, tokenizer_dict, bos_id, backwards=False):
     doc = nlp(sentence)
     pos_tags = [t.tag_ for t in doc]
     ids = tokenize_pos_tags(pos_tags, tokenizer_dict)
-    return [bos_id] + ids
+
+    if backwards:
+        # training logic: append BOS, then reverse
+        ids = (ids + [bos_id])[::-1]
+    else:
+        ids = [bos_id] + ids
+    return ids
 
 
 def load_model(ckpt_path: Path, device: torch.device):
@@ -100,7 +107,7 @@ def sentence_loss(model: GPT, token_ids, device):
 def evaluate(model: GPT, sentences, nlp, tokenizer_dict, device):
     losses = []
     for sent in tqdm(sentences, desc="eval", ncols=80):
-        ids = encode_sentence(sent, nlp, tokenizer_dict, BOS_ID)
+        ids = encode_sentence(sent, nlp, tokenizer_dict, BOS_ID, backwards=BACKWARDS)
         l = sentence_loss(model, ids, device)
         if l is not None:
             losses.append(l)
@@ -139,6 +146,9 @@ def parse_args():
     parser.add_argument("--checkpoint_nano", type=Path)
     parser.add_argument("--meta_path", type=Path)
     parser.add_argument("--device")
+    parser.add_argument(
+        "--backwards", action="store_true", help="evaluate right-to-left sequences"
+    )
     args, _ = parser.parse_known_args()
     return args
 
@@ -151,6 +161,7 @@ def main():
     checkpoint_nano = args.checkpoint_nano or CHECKPOINT_NANO
     meta_path = args.meta_path or META_PATH
     device = torch.device(args.device or DEVICE)
+    backwards = args.backwards or BACKWARDS
 
     # ------------------------------------------------------------------
     # 1. Data: 1 MB of CC-100, sentence-split
@@ -199,14 +210,29 @@ def main():
     # ------------------------------------------------------------------
     # 4. Evaluation
     # ------------------------------------------------------------------
-    # build one big stream (still includes the BOS before each sentence)
-    token_stream = [
-        t
-        for ids in (
-            encode_sentence(s, nlp_tag, tokenizer_dict, BOS_ID) for s in sentences
-        )
-        for t in ids
+    # build one big stream with BOS_ID only at the start
+    # Step 1: Tokenize all sentences. This creates a list of lists of token IDs.
+    # No BOS_ID is added at this stage, and sentences are kept in their original token order.
+    raw_sentence_token_ids = []
+    for s in sentences:
+        doc = nlp_tag(s)  # nlp_tag is the spaCy object for POS-tagging
+        pos_tags = [t.tag_ for t in doc]
+        ids = tokenize_pos_tags(pos_tags, tokenizer_dict)
+        raw_sentence_token_ids.append(ids)
+
+    # Step 2: Flatten the list of lists into a single list of token IDs (concatenated raw tokens)
+    concatenated_raw_tokens = [
+        token_id for sentence_ids in raw_sentence_token_ids for token_id in sentence_ids
     ]
+
+    # Step 3: Add BOS_ID at the start and handle the 'backwards' case
+    if backwards:
+        # For a right-to-left evaluation, the conceptual sequence is (text + BOS_ID),
+        # which is then reversed. This places BOS_ID at index 0 of the final stream.
+        token_stream = (concatenated_raw_tokens + [BOS_ID])[::-1]
+    else:
+        # For a left-to-right evaluation, BOS_ID is prepended to the text.
+        token_stream = [BOS_ID] + concatenated_raw_tokens
 
     print("\n⇢ Evaluating GPT-1 …")
     loss_sent_gpt1 = evaluate(model_gpt1, sentences, nlp_tag, tokenizer_dict, device)
