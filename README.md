@@ -6,6 +6,12 @@ This repository contains a PyTorch implementation of a GPT (Generative Pre-train
 
 This project explores whether large language models exhibit different behaviors when processing sequences in forward vs. backward directions, particularly focusing on how grammatical patterns (represented as POS tags) influence this "arrow of time" phenomenon. The research investigates temporal asymmetries in language model predictions using controlled experiments with grammatical structures.
 
+## Report
+
+📄 **[Research Report: Investigation on the Effect of Grammar on the Arrow of Time Using Large Language Models](Investigation_on_the_Effect_of_Grammar_on_the_Arrow_of_Time_Using_Large_Language_Models.pdf)**
+
+The complete research findings, methodology, and experimental results are documented in the above report.
+
 ## Architecture
 
 The model follows the standard GPT architecture with the following key modifications:
